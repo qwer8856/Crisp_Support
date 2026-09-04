@@ -1,0 +1,24 @@
+{
+  "name": "crisp-like-support",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted embeddable customer support chat inspired by Crisp-style UX.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "mysql2": "^3.14.4",
+    "socket.io": "^4.8.1"
+  }
+}

@@ -1,0 +1,12 @@
+services:
+  support:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3180:3180"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data

@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+node_modules/
+uploads/
+data/
+tests/
+coverage/
+public/demo/
+public/widget/
+public/widget-loader.js
+embed-code.html
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
