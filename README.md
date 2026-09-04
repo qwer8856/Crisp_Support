@@ -13,27 +13,7 @@
 
 ## 简单部署
 
-### 1. 创建 MySQL 数据库
-
-登录服务器已有的 MySQL：
-
-```bash
-mysql -u root -p
-```
-
-执行：
-
-```sql
-CREATE DATABASE support_chat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'support'@'%' IDENTIFIED BY '请修改为数据库密码';
-GRANT ALL PRIVILEGES ON support_chat.* TO 'support'@'%';
-FLUSH PRIVILEGES;
-EXIT;
-```
-
-如果已经存在 `support` 用户，请使用现有用户或执行 `ALTER USER` 修改密码，不要重复创建。
-
-### 2. 在 `/root` 创建项目文件夹
+### 1. 在 `/root` 创建项目文件夹
 
 ```bash
 mkdir -p /root/Crisp_Support
@@ -41,7 +21,7 @@ cd /root/Crisp_Support
 git clone https://github.com/qwer8856/Crisp_Support.git .
 ```
 
-### 3. 修改 `.env`
+### 2. 修改 `.env`
 
 ```bash
 cp .env.example .env
@@ -63,7 +43,7 @@ ADMIN_PASSWORD=请填写管理员密码
 
 如果 MySQL 在其他服务器或其他 Docker 容器中，请把 `DB_HOST` 改成客服容器能够访问的 MySQL 地址。
 
-### 4. 构建并启动
+### 3. 构建并启动
 
 ```bash
 docker compose up -d --build
@@ -71,7 +51,7 @@ docker compose up -d --build
 
 容器名称为 `Crisp_Support`，默认使用 `3180` 端口。
 
-### 5. 打开后台
+### 4. 打开后台
 
 ```text
 http://服务器IP:3180/admin/
