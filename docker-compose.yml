@@ -1,5 +1,6 @@
 services:
   support:
+    container_name: Crisp_Support
     build: .
     restart: unless-stopped
     env_file: .env
