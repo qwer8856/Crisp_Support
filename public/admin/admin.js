@@ -30,7 +30,8 @@
     tokenIdentifierHint: '',
     tokenKeyConfigured: false,
     webhookSecretConfigured: false,
-    webhookUrl: ''
+    webhookUrl: '',
+    recoveryRequired: false
   };
   let systemSettings = {
     publicBaseUrl: '',
@@ -38,7 +39,8 @@
     telegramBotTokenHint: '',
     telegramWebhookSecretConfigured: false,
     telegramWebhookActive: false,
-    telegramWebhookStatusKnown: false
+    telegramWebhookStatusKnown: false,
+    telegramRecoveryRequired: false
   };
 
   try {
@@ -286,7 +288,9 @@
     systemSettings = { ...systemSettings, ...data };
     $('#publicBaseUrlSetting').value = data.publicBaseUrl || '';
     $('#telegramBotToken').value = '';
-    $('#telegramBotToken').placeholder = data.telegramBotTokenConfigured
+    $('#telegramBotToken').placeholder = data.telegramRecoveryRequired
+      ? '旧凭证无法读取，请重新填写'
+      : data.telegramBotTokenConfigured
       ? `已保存 ${data.telegramBotTokenHint}，留空不修改`
       : '从 BotFather 获取';
     $('#telegramWebhookSecret').value = '';
@@ -297,6 +301,9 @@
     setSecretVisibility('telegramWebhookSecret', false);
     renderTelegramSettings();
     renderCrispSettings();
+    if (data.telegramRecoveryRequired) {
+      $('#telegramStatusMessage').textContent = '检测到旧加密凭证无法读取，请重新填写 Bot Token 并保存。';
+    }
   }
 
   async function loadSystemSettings() {
@@ -353,7 +360,10 @@
 
     status.className = 'integration-status';
     const webhookAddressReady = systemSettings.publicBaseUrl.startsWith('https://');
-    if (systemSettings.telegramWebhookStatusKnown && systemSettings.telegramWebhookActive) {
+    if (systemSettings.telegramRecoveryRequired) {
+      status.textContent = '需重新保存';
+      status.classList.add('warning');
+    } else if (systemSettings.telegramWebhookStatusKnown && systemSettings.telegramWebhookActive) {
       status.textContent = 'Webhook 运行中';
       status.classList.add('ready');
     } else if (systemSettings.telegramBotTokenConfigured && systemSettings.telegramWebhookSecretConfigured && webhookAddressReady) {
@@ -380,18 +390,25 @@
     fields.disabled = !site;
     $('#saveCrispSettingsBtn').disabled = !site;
     $('#testCrispConnectionBtn').disabled = !site || !crispSettings.tokenIdentifierConfigured || !crispSettings.tokenKeyConfigured || !crispSettings.websiteId;
-    $('#regenerateCrispSecretBtn').disabled = !site;
+    $('#regenerateCrispSecretBtn').disabled = !site || crispSettings.recoveryRequired;
     $('#copyCrispWebhookBtn').disabled = !site || !crispSettings.webhookUrl;
     $('#crispWebsiteId').value = crispSettings.websiteId || '';
-    $('#crispTokenIdentifier').placeholder = crispSettings.tokenIdentifierConfigured
+    $('#crispTokenIdentifier').placeholder = crispSettings.recoveryRequired
+      ? '旧凭证无法读取，请重新填写'
+      : crispSettings.tokenIdentifierConfigured
       ? `已保存 ${crispSettings.tokenIdentifierHint}，留空不修改`
       : 'Crisp API Token ID';
-    $('#crispTokenKey').placeholder = crispSettings.tokenKeyConfigured ? '已加密保存，留空不修改' : 'Crisp API Token Key';
+    $('#crispTokenKey').placeholder = crispSettings.recoveryRequired
+      ? '旧凭证无法读取，请重新填写'
+      : crispSettings.tokenKeyConfigured ? '已加密保存，留空不修改' : 'Crisp API Token Key';
     $('#crispWebhookUrl').value = crispSettings.webhookUrl || '';
     const status = $('#crispStatus');
     status.className = 'integration-status';
     const complete = crispSettings.websiteId && crispSettings.tokenIdentifierConfigured && crispSettings.tokenKeyConfigured;
-    if (crispSettings.enabled && complete) {
+    if (crispSettings.recoveryRequired) {
+      status.textContent = '需重新保存';
+      status.classList.add('warning');
+    } else if (crispSettings.enabled && complete) {
       status.textContent = '托管中';
       status.classList.add('ready');
     } else if (complete) {
@@ -506,7 +523,8 @@
       tokenIdentifierHint: '',
       tokenKeyConfigured: false,
       webhookSecretConfigured: false,
-      webhookUrl: ''
+      webhookUrl: '',
+      recoveryRequired: false
     };
     resetCrispSecretInputs();
     renderCrispSettings();
@@ -516,6 +534,9 @@
       if (requestId !== crispRequest || selectedSite()?.id !== site.id) return;
       crispSettings = data.crisp;
       renderCrispSettings();
+      if (crispSettings.recoveryRequired) {
+        $('#crispStatusMessage').textContent = '检测到旧加密凭证无法读取，请重新填写 Token ID 和 Token Key 后保存；随后请更新 Crisp 中的 Website Hook 地址。';
+      }
     } catch (error) {
       if (requestId === crispRequest) $('#crispStatusMessage').textContent = error.message;
     }

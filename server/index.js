@@ -153,7 +153,12 @@ async function visitorIdentity(body, site) {
   };
   const identityToken = safeText(body.identityToken, 8000);
   if (!identityToken) return identity;
-  const { visitorIdentitySecret } = await settingsStore.getAll();
+  const { visitorIdentitySecret, unreadableSecretKeys } = await settingsStore.getAll();
+  if (unreadableSecretKeys.includes('visitor_identity_secret')) {
+    const error = new Error('登录用户签名密钥无法读取，请重新配置');
+    error.statusCode = 503;
+    throw error;
+  }
   if (!visitorIdentitySecret) {
     const error = new Error('服务端未配置登录用户签名密钥');
     error.statusCode = 503;
@@ -177,8 +182,7 @@ async function visitorIdentity(body, site) {
   }
 }
 async function publicBaseUrl(req) {
-  const settings = await settingsStore.getAll();
-  return settings.publicBaseUrl || `${req.protocol}://${req.get('host')}`;
+  return await settingsStore.getPublicBaseUrl() || `${req.protocol}://${req.get('host')}`;
 }
 async function getSite(siteKey) {
   const [rows] = await pool.execute('SELECT * FROM sites WHERE site_key = ? LIMIT 1', [siteKey]);
@@ -441,7 +445,7 @@ crispBridge = createCrispBridge({
   afterVisitorMessage: processVisitorText,
   encrypt: value => settingsStore.encrypt(value),
   decrypt: value => settingsStore.decrypt(value),
-  getPublicBaseUrl: async () => (await settingsStore.getAll()).publicBaseUrl
+  getPublicBaseUrl: () => settingsStore.getPublicBaseUrl()
 });
 
 app.post('/api/public/messages', auth('visitor'), async (req, res) => {
@@ -593,15 +597,21 @@ app.get('/api/admin/sites/:id/crisp', auth('admin'), async (req, res) => {
 });
 
 app.get('/api/admin/sites/:id/crisp/secret/:field', auth('admin'), async (req, res) => {
-  const siteId = Number(req.params.id);
-  if (!Number.isSafeInteger(siteId) || siteId <= 0) return res.status(400).json({ error: '网站 ID 无效' });
-  if (!['tokenIdentifier', 'tokenKey'].includes(req.params.field)) {
-    return res.status(400).json({ error: 'Crisp 凭证字段无效' });
+  try {
+    const siteId = Number(req.params.id);
+    if (!Number.isSafeInteger(siteId) || siteId <= 0) return res.status(400).json({ error: '网站 ID 无效' });
+    if (!['tokenIdentifier', 'tokenKey'].includes(req.params.field)) {
+      return res.status(400).json({ error: 'Crisp 凭证字段无效' });
+    }
+    const secret = await crispBridge.secretValue(siteId, req.params.field);
+    if (!secret) return res.status(404).json({ error: '网站不存在' });
+    res.set('Cache-Control', 'no-store');
+    res.json(secret);
+  } catch (error) {
+    res.status(error.code === 'SETTINGS_DECRYPT_FAILED' ? 409 : 400).json({
+      error: error.message || 'Crisp 凭证读取失败'
+    });
   }
-  const secret = await crispBridge.secretValue(siteId, req.params.field);
-  if (!secret) return res.status(404).json({ error: '网站不存在' });
-  res.set('Cache-Control', 'no-store');
-  res.json(secret);
 });
 
 app.patch('/api/admin/sites/:id/crisp', auth('admin'), async (req, res) => {
@@ -632,12 +642,14 @@ app.post('/api/admin/sites/:id/crisp/test', auth('admin'), async (req, res) => {
 
 function publicSettings(settings) {
   const token = settings.telegramBotToken || '';
+  const unreadable = new Set(settings.unreadableSecretKeys || []);
   return {
     publicBaseUrl: settings.publicBaseUrl || '',
     telegramBotTokenConfigured: Boolean(token),
     telegramBotTokenHint: token ? `••••${token.slice(-6)}` : '',
     telegramWebhookSecretConfigured: Boolean(settings.telegramWebhookSecret),
-    visitorIdentitySecretConfigured: Boolean(settings.visitorIdentitySecret)
+    visitorIdentitySecretConfigured: Boolean(settings.visitorIdentitySecret),
+    telegramRecoveryRequired: unreadable.has('telegram_bot_token') || unreadable.has('telegram_webhook_secret')
   };
 }
 
@@ -653,6 +665,10 @@ app.get('/api/admin/settings/secret/:field', auth('admin'), async (req, res) => 
   const settingKey = fields[req.params.field];
   if (!settingKey) return res.status(400).json({ error: '敏感配置字段无效' });
   const settings = await settingsStore.getAll();
+  const databaseKey = settingKey === 'telegramBotToken' ? 'telegram_bot_token' : 'telegram_webhook_secret';
+  if (settings.unreadableSecretKeys.includes(databaseKey)) {
+    return res.status(409).json({ error: '该 Telegram 凭证无法解密，请重新填写 Bot Token 并保存' });
+  }
   res.set('Cache-Control', 'no-store');
   res.json({ value: settings[settingKey] || '' });
 });

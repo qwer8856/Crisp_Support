@@ -170,21 +170,36 @@ function createCrispBridge(options) {
     return rows[0] || null;
   }
 
-  async function decodedConfig(row) {
+  async function decodedConfig(row, { tolerateUnreadable = false } = {}) {
     if (!row) return null;
+    const encryptedFields = {
+      tokenIdentifier: row.crisp_token_identifier || '',
+      tokenKey: row.crisp_token_key || '',
+      webhookSecret: row.crisp_webhook_secret || ''
+    };
+    const decoded = {};
+    const unreadableFields = [];
+    for (const [field, value] of Object.entries(encryptedFields)) {
+      try {
+        decoded[field] = await decrypt(value);
+      } catch (error) {
+        if (!tolerateUnreadable || error.code !== 'SETTINGS_DECRYPT_FAILED') throw error;
+        decoded[field] = '';
+        unreadableFields.push(field);
+      }
+    }
     return {
       siteId: row.id,
       siteKey: row.site_key,
       enabled: row.integration_mode === 'crisp',
       websiteId: row.crisp_website_id || '',
-      tokenIdentifier: await decrypt(row.crisp_token_identifier || ''),
-      tokenKey: await decrypt(row.crisp_token_key || ''),
-      webhookSecret: await decrypt(row.crisp_webhook_secret || '')
+      ...decoded,
+      unreadableFields
     };
   }
 
   async function publicConfig(siteId) {
-    const config = await decodedConfig(await siteRowById(siteId));
+    const config = await decodedConfig(await siteRowById(siteId), { tolerateUnreadable: true });
     if (!config) return null;
     const baseUrl = String(await getPublicBaseUrl() || '').replace(/\/$/, '');
     const webhookUrl = baseUrl && config.webhookSecret
@@ -197,12 +212,23 @@ function createCrispBridge(options) {
       tokenIdentifierHint: config.tokenIdentifier ? `••••${config.tokenIdentifier.slice(-6)}` : '',
       tokenKeyConfigured: Boolean(config.tokenKey),
       webhookSecretConfigured: Boolean(config.webhookSecret),
-      webhookUrl
+      webhookUrl,
+      recoveryRequired: config.unreadableFields.length > 0
     };
   }
 
   async function secretValue(siteId, field) {
-    const config = await decodedConfig(await siteRowById(siteId));
+    let config;
+    try {
+      config = await decodedConfig(await siteRowById(siteId));
+    } catch (error) {
+      if (error.code === 'SETTINGS_DECRYPT_FAILED') {
+        const recoveryError = new Error('Crisp 凭证无法解密，请重新填写 Website Token ID 和 Website Token Key');
+        recoveryError.code = error.code;
+        throw recoveryError;
+      }
+      throw error;
+    }
     if (!config) return null;
     const values = {
       tokenIdentifier: config.tokenIdentifier,
@@ -215,7 +241,7 @@ function createCrispBridge(options) {
   async function saveConfig(siteId, values) {
     const row = await siteRowById(siteId);
     if (!row) return null;
-    const current = await decodedConfig(row);
+    const current = await decodedConfig(row, { tolerateUnreadable: true });
     const websiteId = Object.hasOwn(values, 'websiteId') ? text(values.websiteId, 64) : current.websiteId;
     const suppliedIdentifier = text(values.tokenIdentifier, 512);
     const suppliedKey = text(values.tokenKey, 1024);
@@ -224,6 +250,11 @@ function createCrispBridge(options) {
     const enabled = Object.hasOwn(values, 'enabled') ? values.enabled === true : current.enabled;
     let webhookSecret = current.webhookSecret;
 
+    if (current.unreadableFields.some(field => field === 'tokenIdentifier' || field === 'tokenKey')
+        && (!suppliedIdentifier || !suppliedKey)) {
+      throw new Error('检测到旧加密凭证无法读取，请重新填写 Website Token ID 和 Website Token Key');
+    }
+
     if (websiteId && !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(websiteId)) {
       throw new Error('Crisp Website ID 格式无效');
     }
@@ -231,7 +262,7 @@ function createCrispBridge(options) {
     if (tokenKey && /\s/.test(tokenKey)) throw new Error('Crisp Token Key 不能包含空格');
     if (suppliedIdentifier && suppliedIdentifier.length < 8) throw new Error('Crisp Token ID 格式无效');
     if (suppliedKey && suppliedKey.length < 16) throw new Error('Crisp Token Key 格式无效');
-    if (!webhookSecret || values.regenerateWebhookSecret === true) {
+    if (!webhookSecret || current.unreadableFields.includes('webhookSecret') || values.regenerateWebhookSecret === true) {
       webhookSecret = crypto.randomBytes(32).toString('base64url');
     }
     if (enabled && (!websiteId || !tokenIdentifier || !tokenKey)) {

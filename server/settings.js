@@ -14,6 +14,13 @@ const SECRET_KEYS = new Set([
   'visitor_identity_secret'
 ]);
 
+function unreadableSettingError(error) {
+  const wrapped = new Error('已保存的加密配置无法读取，请重新填写相关敏感配置');
+  wrapped.code = 'SETTINGS_DECRYPT_FAILED';
+  wrapped.cause = error;
+  return wrapped;
+}
+
 function createSettingsStore({ pool, dataDir }) {
   let encryptionKey = null;
 
@@ -50,14 +57,23 @@ function createSettingsStore({ pool, dataDir }) {
 
   async function decrypt(value) {
     if (!value || !value.startsWith('enc:v1:')) return value || '';
-    const [, , ivValue, tagValue, ciphertextValue] = value.split(':');
-    const key = await ensureKey();
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivValue, 'base64url'));
-    decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
-    return Buffer.concat([
-      decipher.update(Buffer.from(ciphertextValue, 'base64url')),
-      decipher.final()
-    ]).toString('utf8');
+    try {
+      const parts = value.split(':');
+      if (parts.length !== 5 || !parts[2] || !parts[3] || !parts[4]) {
+        throw new Error('invalid encrypted setting');
+      }
+      const [, , ivValue, tagValue, ciphertextValue] = parts;
+      const key = await ensureKey();
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivValue, 'base64url'));
+      decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
+      return Buffer.concat([
+        decipher.update(Buffer.from(ciphertextValue, 'base64url')),
+        decipher.final()
+      ]).toString('utf8');
+    } catch (error) {
+      if (error.code === 'SETTINGS_DECRYPT_FAILED') throw error;
+      throw unreadableSettingError(error);
+    }
   }
 
   async function ensureSchema() {
@@ -77,20 +93,35 @@ function createSettingsStore({ pool, dataDir }) {
       publicBaseUrl: '',
       telegramBotToken: '',
       telegramWebhookSecret: '',
-      visitorIdentitySecret: ''
+      visitorIdentitySecret: '',
+      unreadableSecretKeys: []
     };
     const [rows] = await pool.query('SELECT setting_key, setting_value FROM system_settings');
     for (const row of rows) {
       if (!SETTING_KEYS.has(row.setting_key)) continue;
-      const value = SECRET_KEYS.has(row.setting_key)
-        ? await decrypt(row.setting_value)
-        : row.setting_value;
+      let value = row.setting_value;
+      if (SECRET_KEYS.has(row.setting_key)) {
+        try {
+          value = await decrypt(row.setting_value);
+        } catch (error) {
+          if (error.code !== 'SETTINGS_DECRYPT_FAILED') throw error;
+          settings.unreadableSecretKeys.push(row.setting_key);
+          value = '';
+        }
+      }
       if (row.setting_key === 'public_base_url') settings.publicBaseUrl = value;
       if (row.setting_key === 'telegram_bot_token') settings.telegramBotToken = value;
       if (row.setting_key === 'telegram_webhook_secret') settings.telegramWebhookSecret = value;
       if (row.setting_key === 'visitor_identity_secret') settings.visitorIdentitySecret = value;
     }
     return settings;
+  }
+
+  async function getPublicBaseUrl() {
+    const [rows] = await pool.execute(
+      "SELECT setting_value FROM system_settings WHERE setting_key='public_base_url' LIMIT 1"
+    );
+    return rows[0]?.setting_value || '';
   }
 
   async function setMany(values) {
@@ -118,7 +149,7 @@ function createSettingsStore({ pool, dataDir }) {
     }
   }
 
-  return { decrypt, encrypt, ensureSchema, getAll, setMany };
+  return { decrypt, encrypt, ensureSchema, getAll, getPublicBaseUrl, setMany };
 }
 
 module.exports = { createSettingsStore };

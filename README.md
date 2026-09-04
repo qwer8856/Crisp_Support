@@ -87,6 +87,8 @@ http://服务器IP:3180/admin/
 3. 把本系统的“Website Hook 回调地址”粘贴到 Crisp 的 Webhook URL 中。
 4. 事件只需选中 `message:send` 和 `message:received`，然后保存。
 
+> `data/settings.key` 用于解密网页中保存的 Token。更新或迁移服务时请保留整个 `data` 目录；如果该文件已经丢失，请在管理网页重新填写 Crisp Token 和 Telegram Bot Token，并把新生成的 Website Hook 地址更新到 Crisp。
+
 ## 更新
 
 ```bash
