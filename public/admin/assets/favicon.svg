@@ -1,8 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">Crisp Support</title>
-  <desc id="desc">A mint rounded square with a white chat bubble and a curved C mark.</desc>
-  <rect x="20" y="20" width="472" height="472" rx="124" fill="#e1f1eb" stroke="#bfded2" stroke-width="12"/>
-  <path d="M132 126h248c34 0 62 28 62 62v116c0 34-28 62-62 62h-74l-63 54v-54H132c-34 0-62-28-62-62V188c0-34 28-62 62-62Z" fill="#ffffff" stroke="#4c9a79" stroke-width="18" stroke-linejoin="round"/>
-  <path d="M316 205c-17-19-41-30-68-30-51 0-92 37-92 81s41 81 92 81c27 0 51-11 68-30" fill="none" stroke="#4c9a79" stroke-width="24" stroke-linecap="round"/>
-  <circle cx="391" cy="157" r="18" fill="#f4b77b"/>
+  <title id="title">Crisp Support double chat icon</title>
+  <desc id="desc">Two overlapping pastel chat bubbles on a pale blue rounded square.</desc>
+  <rect x="20" y="20" width="472" height="472" rx="124" fill="#eaf3fa" stroke="#cadfeb" stroke-width="12"/>
+  <path d="M210 116h168c39 0 70 31 70 70v72c0 39-31 70-70 70h-30v48l-58-48h-80c-39 0-70-31-70-70v-72c0-39 31-70 70-70Z" fill="#f7cc91" stroke="#e6ad64" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M132 206h174c39 0 70 31 70 70v60c0 39-31 70-70 70h-74l-62 50v-50h-38c-39 0-70-31-70-70v-60c0-39 31-70 70-70Z" fill="#9ed4c0" stroke="#62ad90" stroke-width="16" stroke-linejoin="round"/>
+  <circle cx="170" cy="306" r="15" fill="#ffffff"/>
+  <circle cx="220" cy="306" r="15" fill="#ffffff"/>
+  <circle cx="270" cy="306" r="15" fill="#ffffff"/>
 </svg>

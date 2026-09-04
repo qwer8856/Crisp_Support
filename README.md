@@ -69,6 +69,24 @@ http://服务器IP:3180/admin/
 4. 填写 Telegram Bot Token，绑定网站对应的超级群组，然后启用 Webhook。
 5. 根据需要添加关键词自动回复规则。
 
+### 获取 Website Token
+
+1. 登录 Crisp，依次进入“设置” → “工作区设置” → “高级设置” → “API 令牌”。
+2. 创建或打开当前网站的 Website Token。
+3. 按下面的对应关系填写到本系统后台：
+
+| 本系统中的字段 | Crisp 中的字段 |
+| --- | --- |
+| Website Token ID | API 识别符 |
+| Website Token Key | API 密钥 |
+
+### 配置 Website Hook
+
+1. 在本系统后台复制当前网站的“Website Hook 回调地址”。
+2. 回到 Crisp 的高级设置，新增 Website Hook。
+3. 把本系统的“Website Hook 回调地址”粘贴到 Crisp 的 Webhook URL 中。
+4. 事件只需选中 `message:send` 和 `message:received`，然后保存。
+
 ## 更新
 
 ```bash
